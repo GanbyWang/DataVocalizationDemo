@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="freetts_lib">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/lib/freetts_lib" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+    <jarDirectory url="file://$PROJECT_DIR$/lib/freetts_lib" recursive="false" />
+  </library>
+</component>
