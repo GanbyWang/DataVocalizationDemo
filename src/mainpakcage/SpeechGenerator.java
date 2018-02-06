@@ -5,12 +5,6 @@ import java.util.ArrayList;
 import java.util.Random;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Locale;
-
-import javax.speech.Central;
-import javax.speech.synthesis.Synthesizer;
-import javax.speech.synthesis.SynthesizerModeDesc;
-import javax.speech.synthesis.Voice;
 
 /** Used to generate the optimal speech */
 public class SpeechGenerator {
@@ -26,29 +20,45 @@ public class SpeechGenerator {
     private Speech optimalSpeech;
     private SpeechRelation optimalRelatedSpeech;
     private String outputSpeech;
+    // Accessor to the database
+    private DbAccessor dbAccessor;
+    // Extra constraint on querying
+    private String extraSQL;
+    // The general information of the target column (mean and variance)
+    private String targetColInfo;
+    // The sample fraction (0-100)
+    private int sampleFraction;
 
     /**
      * Constructor function
      * Two parameters: target column and the original data
      * */
-    public SpeechGenerator(int targetColumn, DataAnalysis data, int maxCol, int repeatTimes) {
+    public SpeechGenerator(int targetColumn, DataAnalysis data,
+                           int maxCol, int sampleFraction, String extraSQL) {
         this.targetColumn = targetColumn;
         this.data = data;
+        this.extraSQL = extraSQL;
+        this.sampleFraction = sampleFraction;
+
+        // Generate a new accessor to database
+        dbAccessor = new DbAccessor();
 
         // Generate all possible speeches
 //        generateAllSpeeches();
 //        printAllSpeeches();
-        System.out.printf("Maximum columns: %d\n", maxCol);
+        System.out.printf("Maximum Columns: %d\n", maxCol);
         generateAllWithoutFactor(maxCol);
 //        printAllRelatedSpeeches();
 
         // Repeat enough times to find the optimal speech
 //         compete(repeatTimes);
-        competeWithDB(repeatTimes);
+        competeWithDB();
 
         // Get the optimal speech
 //         getOptimal();
         getRelatedOptimal();
+
+        dbAccessor.disconnected();
     }
 
     /** Generate all speeches */
@@ -244,24 +254,39 @@ public class SpeechGenerator {
      * Used to distinguish speeches with factors
      * One parameter: the repeat time
      * */
-    private void competeWithDB(int repeatTimes) {
+    private void competeWithDB() {
         System.out.printf("Target Column: %d\n", targetColumn);
-        System.out.printf("Repeated Times: %d\n", repeatTimes);
+//        System.out.printf("Repeated Times: %d\n", repeatTimes);
 
-        // Create a new database accessor
-        DbAccessor accessor = new DbAccessor();
-        int tupleNum = accessor.getTupleNum();
+//        // Create a new database accessor
+//        int tupleNum = dbAccessor.getTupleNum();
+
+//        List<List<Double>> sample1 = dbAccessor.getSample(sampleFraction);
+//        List<List<Double>> sample2 = dbAccessor.getSample(sampleFraction);
+
+        List<List<Double>> sample1 = dbAccessor.getSample(sampleFraction, extraSQL);
+        List<List<Double>> sample2 = dbAccessor.getSample(sampleFraction, extraSQL);
+
+        int repeatTimes = Math.min(sample1.size(), sample2.size());
+
+        System.out.printf("Sampling Fraction: %d\n", sampleFraction);
+        System.out.printf("Repeated Times: %d\n", repeatTimes);
+//        System.out.printf("Size of sample1: %d\n", sample1.size());
+//        System.out.printf("Size of sample2: %d\n", sample2.size());
 
         for(int i = 0; i < repeatTimes; i++) {
-            // Generate two random tuples
-            int index1 = new Random().nextInt(tupleNum);
-            int index2 = new Random().nextInt(tupleNum);
-            while(index2 == index1) {
-                index2 = new Random().nextInt(tupleNum);
-            }
+//            // Generate two random tuples
+//            int index1 = new Random().nextInt(tupleNum);
+//            int index2 = new Random().nextInt(tupleNum);
+//            while(index2 == index1) {
+//                index2 = new Random().nextInt(tupleNum);
+//            }
+//
+//            List<Double> tuple1 = dbAccessor.getTupleById(index1 + 1);
+//            List<Double> tuple2 = dbAccessor.getTupleById(index2 + 1);
 
-            List<Double> tuple1 = accessor.getTupleById(index1 + 1);
-            List<Double> tuple2 = accessor.getTupleById(index2 + 1);
+            List<Double> tuple1 = sample1.get(i);
+            List<Double> tuple2 = sample2.get(repeatTimes - 1 - i);
 
             // Repeat for every speech
             for(SpeechRelation relatedSpeech : relatedSpeeches) {
@@ -343,22 +368,34 @@ public class SpeechGenerator {
 
     /** Get the optimal speech with factors */
     public void getRelatedOptimal() {
-        // Sort the speech
-        Collections.sort(relatedSpeeches, new Comparator<SpeechRelation>() {
-            @Override
-            public int compare(SpeechRelation o1, SpeechRelation o2) {
-                if(o1.speech.score < o2.speech.score) {
-                    return -1;
-                } else if(o1.speech.score == o2.speech.score) {
-                    return 0;
-                } else {
-                    return 1;
-                }
-            }
-        });
+//        // Sort the speech
+//        Collections.sort(relatedSpeeches, new Comparator<SpeechRelation>() {
+//            @Override
+//            public int compare(SpeechRelation o1, SpeechRelation o2) {
+//                if(o1.speech.score < o2.speech.score) {
+//                    return -1;
+//                } else if(o1.speech.score == o2.speech.score) {
+//                    return 0;
+//                } else {
+//                    return 1;
+//                }
+//            }
+//        });
+//
+//        // Get the speech with the highest score
+//        optimalRelatedSpeech = relatedSpeeches.get(relatedSpeeches.s
 
-        // Get the speech with the highest score
-        optimalRelatedSpeech = relatedSpeeches.get(relatedSpeeches.size() - 1);
+        targetColInfo = dbAccessor.colInfo(data.tableNames[targetColumn],
+                sampleFraction, data.columnNames[targetColumn]);
+
+        // Loop to find the maximum score
+        int maxScore = 0;
+        for(SpeechRelation relatedSpeech : relatedSpeeches) {
+            if(relatedSpeech.speech.score > maxScore) {
+                maxScore = relatedSpeech.speech.score;
+                optimalRelatedSpeech = relatedSpeech;
+            }
+        }
 
         optimalRelatedSpeech.printInfo();
 
@@ -383,34 +420,16 @@ public class SpeechGenerator {
             outputSpeech += ". ";
         }
 
+        System.out.printf("Target Column Information: %s\n", targetColInfo);
         System.out.printf("Optimal Speech: %s\n", outputSpeech);
+
+        outputSpeech = targetColInfo + outputSpeech;
     }
 
     /**
      * Read out the optimal speech
-     * Copied from the web
      * */
-    public void readOutResult() {
-        try {
-            SynthesizerModeDesc desc = new SynthesizerModeDesc("FreeTTS en_US general synthesizer", "general",
-                    Locale.US, null, null);
-            Synthesizer synthesizer = Central.createSynthesizer(desc);
-            if (synthesizer == null) {
-                System.exit(1);
-            }
-            synthesizer.allocate();
-            synthesizer.resume();
-            desc = (SynthesizerModeDesc) synthesizer.getEngineModeDesc();
-            Voice voices[] = desc.getVoices();
-            if(voices != null && voices.length > 0) {
-                synthesizer.getSynthesizerProperties().setVoice(voices[0]);
-                // Read out the speech as an argument
-                synthesizer.speakPlainText(outputSpeech, null);
-                synthesizer.waitEngineState(0x10000L);
-            }
-            synthesizer.deallocate();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
+    public String readOutResult() {
+        return outputSpeech;
     }
 }

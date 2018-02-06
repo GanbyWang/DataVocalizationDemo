@@ -59,8 +59,14 @@ public class DataAnalysis {
     * Change the names a little to make them more natural to read out
     * */
     public String[] columnNames = {
-            "the satisfaction level", "last evaluation", "the number of projects", "average of monthly hours",
+            "satisfaction level", "last evaluation", "the number of projects", "average of monthly hours",
             "time spent in company", "work accidents", "left", "promotion in last 5 years"
+    };
+
+    /** The table column names of the data in the database */
+    public String[] tableNames = {
+            "satisfaction_level", "last_evaluation", "number_project", "average_montly_hours", "time_spend_company",
+            "work_accident", "if_left", "promotion_last_5years", "sales", "salary", "id"
     };
 
     /** Used to store the file */
