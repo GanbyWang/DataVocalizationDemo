@@ -1,33 +1,36 @@
 package mainpakcage;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Random;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.*;
 
 /** Used to generate the optimal speech */
 public class SpeechGenerator {
     // Store the target column
-    private int targetColumn;
+    protected int targetColumn;
     // An array of all possible speeches
-    private List<Speech> speeches;
+    protected List<Speech> speeches;
     // An array of all possible speeches with relations
-    private List<SpeechRelation> relatedSpeeches;
+    protected List<SpeechRelation> relatedSpeeches;
     // The data to analyze
     DataAnalysis data;
     // The results
-    private Speech optimalSpeech;
-    private SpeechRelation optimalRelatedSpeech;
-    private String outputSpeech;
+    protected Speech optimalSpeech;
+    protected SpeechRelation optimalRelatedSpeech;
+    protected String outputSpeech;
     // Accessor to the database
-    private DbAccessor dbAccessor;
+    protected DbAccessor dbAccessor;
     // Extra constraint on querying
-    private String extraSQL;
+    protected String extraSQL;
     // The general information of the target column (mean and variance)
-    private String targetColInfo;
+    protected String targetColInfo;
     // The sample fraction (0-100)
-    private int sampleFraction;
+    protected int sampleFraction;
+    // The maximum of columns in the speech
+    protected int maxCol;
+
+    /**
+     * Empty constructor for subclass
+     * */
+    public SpeechGenerator() {}
 
     /**
      * Constructor function
@@ -40,14 +43,16 @@ public class SpeechGenerator {
         this.extraSQL = extraSQL;
         this.sampleFraction = sampleFraction;
 
-        // Generate a new accessor to database
-        dbAccessor = new DbAccessor();
+//        // Generate a new accessor to database
+//        dbAccessor = new DbAccessor();
 
         // Generate all possible speeches
 //        generateAllSpeeches();
 //        printAllSpeeches();
         System.out.printf("Maximum Columns: %d\n", maxCol);
-        generateAllWithoutFactor(maxCol);
+//        generateAllWithoutFactor(maxCol);
+        generateAllWithBSI(maxCol);
+//        printAllSpeeches();
 //        printAllRelatedSpeeches();
 
         // Repeat enough times to find the optimal speech
@@ -58,59 +63,129 @@ public class SpeechGenerator {
 //         getOptimal();
         getRelatedOptimal();
 
-        dbAccessor.disconnected();
+//        dbAccessor.disconnected();
     }
 
-    /** Generate all speeches */
-    private void generateAllSpeeches() {
+//    /** Generate all speeches */
+//    private void generateAllSpeeches() {
+//        speeches = new ArrayList<Speech>();
+//
+//        /*
+//        * Since the limit of characters is 300
+//        * We only generate speeches with no more than 5 columns
+//        * */
+//        for(int i = 0; i < 8; i++) {
+//            if(i == targetColumn) {
+//                continue;
+//            }
+//
+//            ArrayList<Integer> columns = new ArrayList<Integer>();
+//            columns.add(i);
+//            speeches.add(new Speech(columns));
+//
+//            for(int j = i + 1; j < 8; j++) {
+//                if (j == targetColumn) {
+//                    continue;
+//                }
+//
+//                columns = new ArrayList<Integer>();
+//                columns.add(i);
+//                columns.add(j);
+//                speeches.add(new Speech(columns));
+//
+//                for (int k = j + 1; k < 8; k++) {
+//                    if(k == targetColumn) {
+//                        continue;
+//                    }
+//
+//                    columns = new ArrayList<Integer>();
+//                    columns.add(i);
+//                    columns.add(j);
+//                    columns.add(k);
+//                    speeches.add(new Speech(columns));
+//
+//                    for (int l = k + 1; l < 8; l++) {
+//                        if(l == targetColumn) {
+//                            continue;
+//                        }
+//
+//                        columns = new ArrayList<Integer>();
+//                        columns.add(i);
+//                        columns.add(j);
+//                        columns.add(k);
+//                        columns.add(l);
+//                        speeches.add(new Speech(columns));
+//                    }
+//                }
+//            }
+//        }
+//    }
+
+    /*
+    * Function to generate all possible related speeches
+    * Uses BitSetIterator class
+    * */
+    private void generateAllWithBSI(int maxCol) {
+        // Limit the range of maximum columns
+        if(maxCol >= 8) {
+            maxCol = 7;
+        }
+
         speeches = new ArrayList<Speech>();
+        relatedSpeeches = new ArrayList<SpeechRelation>();
 
-        /*
-        * Since the limit of characters is 300
-        * We only generate speeches with no more than 5 columns
-        * */
-        for(int i = 0; i < 8; i++) {
-            if(i == targetColumn) {
-                continue;
-            }
+        BitSet speechSet = new BitSet(8);
+        speechSet.set(0, 8, true);
 
-            ArrayList<Integer> columns = new ArrayList<Integer>();
-            columns.add(i);
-            speeches.add(new Speech(columns));
+        // Enumerate all possible speech widths
+        for(int k = 1; k <= maxCol; k++) {
+            BitSetIterator bitSetIterator = new BitSetIterator(speechSet, k);
 
-            for(int j = i + 1; j < 8; j++) {
-                if (j == targetColumn) {
-                    continue;
+            while(bitSetIterator.hasNext()) {
+                BitSet answer = bitSetIterator.next();
+                List<Integer> tmpCol = new ArrayList<Integer>();
+
+                int i;
+                for(i = 0; i < 8; i++) {
+                    if(answer.get(i) == true) {
+                        if(i == targetColumn) {
+                            break;
+                        } else {
+                            tmpCol.add(i);
+                        }
+                    }
                 }
 
-                columns = new ArrayList<Integer>();
-                columns.add(i);
-                columns.add(j);
-                speeches.add(new Speech(columns));
+                // Add a speech to speech list
+                if(i == 8) {
+                    speeches.add(new Speech(tmpCol));
+                }
+            }
+        }
 
-                for (int k = j + 1; k < 8; k++) {
-                    if(k == targetColumn) {
-                        continue;
-                    }
+        // For each speech, generate all possible relation sets
+        for(Speech speech : speeches) {
+            // The width of relation set is determined by the speech size
+            int k = speech.columns.size();
+            BitSet relationSet = new BitSet(k);
+            relationSet.set(0, k, true);
 
-                    columns = new ArrayList<Integer>();
-                    columns.add(i);
-                    columns.add(j);
-                    columns.add(k);
-                    speeches.add(new Speech(columns));
+            for(int j = 0; j <= k; j++) {
+                BitSetIterator bitSetIterator = new BitSetIterator(relationSet, j);
 
-                    for (int l = k + 1; l < 8; l++) {
-                        if(l == targetColumn) {
-                            continue;
+                while(bitSetIterator.hasNext()) {
+                    BitSet answer = bitSetIterator.next();
+                    List<Integer> relations = new ArrayList<Integer>();
+
+                    for(int i = 0; i < k; i++) {
+                        if(answer.get(i) == true) {
+                            relations.add(1);
+                        } else {
+                            relations.add(-1);
                         }
-
-                        columns = new ArrayList<Integer>();
-                        columns.add(i);
-                        columns.add(j);
-                        columns.add(k);
-                        columns.add(l);
-                        speeches.add(new Speech(columns));
                     }
+
+                    relatedSpeeches.add(new SpeechRelation(speech, relations));
                 }
             }
         }
@@ -198,57 +273,57 @@ public class SpeechGenerator {
         }
     }
 
-    /**
-     * Used to distinguish speeches
-     * One parameter: the repeat time
-     * */
-    private void compete(int repeatTimes) {
-
-        System.out.printf("Target Column: %d\n", targetColumn);
-        System.out.printf("Repeated Times: %d\n", repeatTimes);
-
-        for(int i = 0; i < repeatTimes; i++) {
-            // Generate two random tuples
-            int index1 = new Random().nextInt(data.originData.size());
-            int index2 = new Random().nextInt(data.originData.size());
-            while(index2 == index1) {
-                index2 = new Random().nextInt(data.originData.size());
-            }
-
-            DataAnalysis.tuple tuple1 = data.originData.get(index1);
-            DataAnalysis.tuple tuple2 = data.originData.get(index2);
-
-            // Repeat for each single speech
-            for(Speech singleSpeech : speeches) {
-                // Initialize scores of tuples
-                int score1 = 0;
-                int score2 = 0;
-
-                // Calculate scores
-                for(Integer col : singleSpeech.columns) {
-                    if(data.factorMatrix[targetColumn][col] > 0) {
-                        if(tuple1.columns[col] > tuple2.columns[col]) {
-                            score1++;
-                        } else if(tuple1.columns[col] < tuple2.columns[col]) {
-                            score2++;
-                        }
-                    } else {
-                        if(tuple1.columns[col] > tuple2.columns[col]) {
-                            score1--;
-                        } else if(tuple1.columns[col] < tuple2.columns[col]) {
-                            score2--;
-                        }
-                    }
-                }
-
-                // If the prediction is correct, this speech gets one point
-                if((score1 > score2 && tuple1.columns[targetColumn] > tuple2.columns[targetColumn])
-                        || (score1 < score2 && tuple1.columns[targetColumn] < tuple2.columns[targetColumn])) {
-                    singleSpeech.score++;
-                }
-            }
-        }
-    }
+//    /**
+//     * Used to distinguish speeches
+//     * One parameter: the repeat time
+//     * */
+//    private void compete(int repeatTimes) {
+//
+//        System.out.printf("Target Column: %d\n", targetColumn);
+//        System.out.printf("Repeated Times: %d\n", repeatTimes);
+//
+//        for(int i = 0; i < repeatTimes; i++) {
+//            // Generate two random tuples
+//            int index1 = new Random().nextInt(data.originData.size());
+//            int index2 = new Random().nextInt(data.originData.size());
+//            while(index2 == index1) {
+//                index2 = new Random().nextInt(data.originData.size());
+//            }
+//
+//            DataAnalysis.tuple tuple1 = data.originData.get(index1);
+//            DataAnalysis.tuple tuple2 = data.originData.get(index2);
+//
+//            // Repeat for each single speech
+//            for(Speech singleSpeech : speeches) {
+//                // Initialize scores of tuples
+//                int score1 = 0;
+//                int score2 = 0;
+//
+//                // Calculate scores
+//                for(Integer col : singleSpeech.columns) {
+//                    if(data.factorMatrix[targetColumn][col] > 0) {
+//                        if(tuple1.columns[col] > tuple2.columns[col]) {
+//                            score1++;
+//                        } else if(tuple1.columns[col] < tuple2.columns[col]) {
+//                            score2++;
+//                        }
+//                    } else {
+//                        if(tuple1.columns[col] > tuple2.columns[col]) {
+//                            score1--;
+//                        } else if(tuple1.columns[col] < tuple2.columns[col]) {
+//                            score2--;
+//                        }
+//                    }
+//                }
+//
+//                // If the prediction is correct, this speech gets one point
+//                if((score1 > score2 && tuple1.columns[targetColumn] > tuple2.columns[targetColumn])
+//                        || (score1 < score2 && tuple1.columns[targetColumn] < tuple2.columns[targetColumn])) {
+//                    singleSpeech.score++;
+//                }
+//            }
+//        }
+//    }
 
     /**
      * Used to distinguish speeches with factors
@@ -264,10 +339,13 @@ public class SpeechGenerator {
 //        List<List<Double>> sample1 = dbAccessor.getSample(sampleFraction);
 //        List<List<Double>> sample2 = dbAccessor.getSample(sampleFraction);
 
-        List<List<Double>> sample1 = dbAccessor.getSample(sampleFraction, extraSQL);
-        List<List<Double>> sample2 = dbAccessor.getSample(sampleFraction, extraSQL);
+//        List<List<Double>> sample1 = dbAccessor.getSample(sampleFraction, extraSQL);
+//        List<List<Double>> sample2 = dbAccessor.getSample(sampleFraction, extraSQL);
+        List<List<Double>> sample = data.sample;
+        int sampleNum = sample.size();
+        int repeatTimes = sampleNum;
 
-        int repeatTimes = Math.min(sample1.size(), sample2.size());
+//        int repeatTimes = Math.min(sample1.size(), sample2.size());
 
         System.out.printf("Sampling Fraction: %d\n", sampleFraction);
         System.out.printf("Repeated Times: %d\n", repeatTimes);
@@ -275,18 +353,18 @@ public class SpeechGenerator {
 //        System.out.printf("Size of sample2: %d\n", sample2.size());
 
         for(int i = 0; i < repeatTimes; i++) {
-//            // Generate two random tuples
-//            int index1 = new Random().nextInt(tupleNum);
-//            int index2 = new Random().nextInt(tupleNum);
-//            while(index2 == index1) {
-//                index2 = new Random().nextInt(tupleNum);
-//            }
-//
-//            List<Double> tuple1 = dbAccessor.getTupleById(index1 + 1);
-//            List<Double> tuple2 = dbAccessor.getTupleById(index2 + 1);
+            // Generate two random tuples
+            int index1 = new Random().nextInt(sampleNum);
+            int index2 = new Random().nextInt(sampleNum);
+            while(index2 == index1) {
+                index2 = new Random().nextInt(sampleNum);
+            }
 
-            List<Double> tuple1 = sample1.get(i);
-            List<Double> tuple2 = sample2.get(repeatTimes - 1 - i);
+            List<Double> tuple1 = sample.get(index1);
+            List<Double> tuple2 = sample.get(index2);
+
+//            List<Double> tuple1 = sample1.get(i);
+//            List<Double> tuple2 = sample2.get(repeatTimes - 1 - i);
 
             // Repeat for every speech
             for(SpeechRelation relatedSpeech : relatedSpeeches) {
@@ -323,48 +401,48 @@ public class SpeechGenerator {
         }
     }
 
-    /** Get the optimal speech */
-    private void getOptimal() {
-        // Sort the speech
-        Collections.sort(speeches, new Comparator<Speech>() {
-            @Override
-            public int compare(Speech o1, Speech o2) {
-                if(o1.score < o2.score) {
-                    return -1;
-                } else if(o1.score == o2.score) {
-                    return 0;
-                } else {
-                    return 1;
-                }
-            }
-        });
-
-        // Get the speech with the highest score
-        optimalSpeech = speeches.get(speeches.size() - 1);
-
-        optimalSpeech.printInfo();
-
-        // Change the result into a string
-        outputSpeech = "";
-
-        for(int col : optimalSpeech.columns) {
-            outputSpeech += "Column ";
-            outputSpeech += data.columnNames[col];
-            outputSpeech += " is ";
-
-            if(data.factorMatrix[targetColumn][col] < 0) {
-                outputSpeech += "negatively ";
-            } else {
-                outputSpeech += "positively ";
-            }
-
-            outputSpeech += "correlated with column ";
-            outputSpeech += data.columnNames[targetColumn];
-            outputSpeech += ". ";
-        }
-
-        System.out.printf("Optimal Speech: %s\n", outputSpeech);
-    }
+//    /** Get the optimal speech */
+//    private void getOptimal() {
+//        // Sort the speech
+//        Collections.sort(speeches, new Comparator<Speech>() {
+//            @Override
+//            public int compare(Speech o1, Speech o2) {
+//                if(o1.score < o2.score) {
+//                    return -1;
+//                } else if(o1.score == o2.score) {
+//                    return 0;
+//                } else {
+//                    return 1;
+//                }
+//            }
+//        });
+//
+//        // Get the speech with the highest score
+//        optimalSpeech = speeches.get(speeches.size() - 1);
+//
+//        optimalSpeech.printInfo();
+//
+//        // Change the result into a string
+//        outputSpeech = "";
+//
+//        for(int col : optimalSpeech.columns) {
+//            outputSpeech += "Column ";
+//            outputSpeech += data.columnNames[col];
+//            outputSpeech += " is ";
+//
+//            if(data.factorMatrix[targetColumn][col] < 0) {
+//                outputSpeech += "negatively ";
+//            } else {
+//                outputSpeech += "positively ";
+//            }
+//
+//            outputSpeech += "correlated with column ";
+//            outputSpeech += data.columnNames[targetColumn];
+//            outputSpeech += ". ";
+//        }
+//
+//        System.out.printf("Optimal Speech: %s\n", outputSpeech);
+//    }
 
     /** Get the optimal speech with factors */
     public void getRelatedOptimal() {
@@ -385,8 +463,10 @@ public class SpeechGenerator {
 //        // Get the speech with the highest score
 //        optimalRelatedSpeech = relatedSpeeches.get(relatedSpeeches.s
 
-        targetColInfo = dbAccessor.colInfo(data.tableNames[targetColumn],
-                sampleFraction, data.columnNames[targetColumn]);
+//        targetColInfo = dbAccessor.colInfo(data.tableNames[targetColumn],
+//                sampleFraction, data.columnNames[targetColumn]);
+
+        targetColInfo = data.colInfo();
 
         // Loop to find the maximum score
         int maxScore = 0;
@@ -399,31 +479,94 @@ public class SpeechGenerator {
 
         optimalRelatedSpeech.printInfo();
 
-        // Change the result into a string
+//        generateSpeechNaive();
+        // Generate compressed speech
+        generateSpeechCompressed();
+
+        System.out.printf("Optimal Speech: %s\n", outputSpeech);
+        System.out.printf("General Information: %s\n", targetColInfo);
+
+        outputSpeech = outputSpeech + targetColInfo;
+    }
+
+//    private void generateSpeechNaive() {
+//        // Change the result into a string
+//        outputSpeech = "";
+//
+//        for(int i = 0; i < optimalRelatedSpeech.relations.size(); i++) {
+//            int col = optimalRelatedSpeech.speech.columns.get(i);
+//
+//            outputSpeech += "Column ";
+//            outputSpeech += data.columnNames[col];
+//            outputSpeech += " is ";
+//
+//            if(optimalRelatedSpeech.relations.get(i) < 0) {
+//                outputSpeech += "negatively ";
+//            } else {
+//                outputSpeech += "positively ";
+//            }
+//
+//            outputSpeech += "correlated with column ";
+//            outputSpeech += data.columnNames[targetColumn];
+//            outputSpeech += ". ";
+//        }
+//    }
+
+    /* Helper function to compress speech */
+    private void generateSpeechCompressed() {
         outputSpeech = "";
 
-        for(int i = 0; i < optimalRelatedSpeech.relations.size(); i++) {
-            int col = optimalRelatedSpeech.speech.columns.get(i);
+        List<Integer> positiveCols = new ArrayList<Integer>();
+        List<Integer> negativeCols = new ArrayList<Integer>();
 
-            outputSpeech += "Column ";
-            outputSpeech += data.columnNames[col];
-            outputSpeech += " is ";
+        List<Integer> resultCols = optimalRelatedSpeech.speech.columns;
+        List<Integer> resultRelations = optimalRelatedSpeech.relations;
 
-            if(optimalRelatedSpeech.relations.get(i) < 0) {
-                outputSpeech += "negatively ";
-            } else {
-                outputSpeech += "positively ";
+        for(int i = 0; i < resultCols.size(); i++) {
+            if(resultRelations.get(i) > 0) {
+                positiveCols.add(resultCols.get(i));
+            } else if(resultRelations.get(i) < 0) {
+                negativeCols.add(resultCols.get(i));
             }
+        }
 
-            outputSpeech += "correlated with column ";
+        if(positiveCols.size() > 1) {
+            outputSpeech += "Columns ";
+            for(int i = 0; i < positiveCols.size() - 1; i++) {
+                outputSpeech += data.columnNames[positiveCols.get(i)];
+                outputSpeech += ", ";
+            }
+            outputSpeech += "and ";
+            outputSpeech += data.columnNames[positiveCols.get(positiveCols.size() - 1)];
+            outputSpeech += " are positively correlated with ";
+            outputSpeech += data.columnNames[targetColumn];
+            outputSpeech += ". ";
+        } else if(positiveCols.size() == 1) {
+            outputSpeech += "Column ";
+            outputSpeech += data.columnNames[positiveCols.get(0)];
+            outputSpeech += " is positively correlated with ";
             outputSpeech += data.columnNames[targetColumn];
             outputSpeech += ". ";
         }
 
-        System.out.printf("Target Column Information: %s\n", targetColInfo);
-        System.out.printf("Optimal Speech: %s\n", outputSpeech);
-
-        outputSpeech = targetColInfo + outputSpeech;
+        if(negativeCols.size() > 1) {
+            outputSpeech += "Columns ";
+            for(int i = 0; i < negativeCols.size() - 1; i++) {
+                outputSpeech += data.columnNames[negativeCols.get(i)];
+                outputSpeech += ", ";
+            }
+            outputSpeech += "and ";
+            outputSpeech += data.columnNames[negativeCols.get(negativeCols.size() - 1)];
+            outputSpeech += " are negatively correlated with ";
+            outputSpeech += data.columnNames[targetColumn];
+            outputSpeech += ". ";
+        } else if(negativeCols.size() == 1) {
+            outputSpeech += "Column ";
+            outputSpeech += data.columnNames[negativeCols.get(0)];
+            outputSpeech += " is negatively correlated with ";
+            outputSpeech += data.columnNames[targetColumn];
+            outputSpeech += ". ";
+        }
     }
 
     /**

@@ -20,7 +20,7 @@ public class Main {
         System.out.printf("Extra query constraint is: \"%s\"\n", extraSQL);
 
         // Read the file in
-        DataAnalysis data = new DataAnalysis();
+        DataAnalysis data = new DataAnalysis(sampleFraction, extraSQL, targetCol);
 //        try {
 //            data.readFile();
 //        } catch (Exception e) {
@@ -31,10 +31,14 @@ public class Main {
         SpeechGenerator generator = new SpeechGenerator(targetCol, data,
                 maxCol, sampleFraction, extraSQL);
 
+        // Generate the output speech
+        MixedSpeechGenerator mixedGenerator = new MixedSpeechGenerator(targetCol, data,
+                maxCol, sampleFraction, extraSQL);
+
         DistributionGenerator disGenerator = new DistributionGenerator(data, targetCol, sampleFraction);
 
-        // Read out the result
-        Speaker speaker = new Speaker();
-        speaker.speakString(generator.readOutResult() + disGenerator.readOutResult());
+//        // Read out the result
+//        Speaker speaker = new Speaker();
+//        speaker.speakString(mixedGenerator.readOutResult() + disGenerator.readOutResult());
     }
 }

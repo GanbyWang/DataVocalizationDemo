@@ -30,53 +30,53 @@ public class DistributionGenerator {
         dbAccessor.disconnected();
     }
 
-    /*
-     * Calculate the mean of the given array
-     * One parameter: the array
-     * */
-    private double getMean(List<Double> list) {
-        double sum = 0;
-        for(Double each : list) {
-            sum += each;
-        }
-        return sum / (double) list.size();
-    }
-
-    /*
-     * Calculate the variance of the given array
-     * Two parameter: the array and the mean of the array
-     * */
-    private double getVariance(List<Double> list, double mean) {
-        double sum = 0;
-        for(Double each : list) {
-            sum += Math.pow(each - mean, 2);
-        }
-        return sum / (double) list.size();
-    }
-
-    // Get the maximum of the given array
-    private Double getMax(List<Double> list) {
-        double max = 0;
-        for(Double element : list) {
-            if(element > max) {
-                max = element;
-            }
-        }
-
-        return max;
-    }
-
-    // Get the minimum of the given array
-    private Double getMin(List<Double> list) {
-        double min = Double.MAX_VALUE;
-        for(Double element : list) {
-            if(element < min) {
-                min = element;
-            }
-        }
-
-        return min;
-    }
+//    /*
+//     * Calculate the mean of the given array
+//     * One parameter: the array
+//     * */
+//    private double getMean(List<Double> list) {
+//        double sum = 0;
+//        for(Double each : list) {
+//            sum += each;
+//        }
+//        return sum / (double) list.size();
+//    }
+//
+//    /*
+//     * Calculate the variance of the given array
+//     * Two parameter: the array and the mean of the array
+//     * */
+//    private double getVariance(List<Double> list, double mean) {
+//        double sum = 0;
+//        for(Double each : list) {
+//            sum += Math.pow(each - mean, 2);
+//        }
+//        return sum / (double) list.size();
+//    }
+//
+//    // Get the maximum of the given array
+//    private Double getMax(List<Double> list) {
+//        double max = 0;
+//        for(Double element : list) {
+//            if(element > max) {
+//                max = element;
+//            }
+//        }
+//
+//        return max;
+//    }
+//
+//    // Get the minimum of the given array
+//    private Double getMin(List<Double> list) {
+//        double min = Double.MAX_VALUE;
+//        for(Double element : list) {
+//            if(element < min) {
+//                min = element;
+//            }
+//        }
+//
+//        return min;
+//    }
 
     // Calculate the corresponding value of the given value
     private double getNormalValue(double number, double var, double avg) {
@@ -93,12 +93,14 @@ public class DistributionGenerator {
     // Generate the more possible distribution
     private void generateDistribution() {
         // Generate a sample
-        List<Double> sample = dbAccessor.getSingleColSample(sampleFraction, data.tableNames[targetCol]);
+//        List<Double> sample = dbAccessor.getSingleColSample(sampleFraction, data.tableNames[targetCol]);
 
-        double avg = getMean(sample);
-        double var = getVariance(sample, avg);
-        double max = getMax(sample);
-        double min = getMin(sample);
+        List<Double> sample = data.singleColList;
+
+        double avg = data.sampleMean;
+        double var = data.sampleVar;
+        double max = data.sampleMax;
+        double min = data.sampleMin;
 
         double normalScore = 0;
         double uniScore = 0;
@@ -114,14 +116,12 @@ public class DistributionGenerator {
 //        System.out.printf("Uni Score: %f, Nor Score: %f\n", uniScore, normalScore);
 
         if(normalScore > uniScore) {
-            distributionInfo = "Column " + data.columnNames[targetCol]
-                    + " is more likely to be a normal distribution.";
+            distributionInfo = "and it's more likely to be a normal distribution.";
         } else {
-            distributionInfo = "Column " + data.columnNames[targetCol]
-                    + " is more likely to be a uniform distribution.";
+            distributionInfo = "and it's more likely to be a uniform distribution.";
         }
 
-        System.out.printf("Distribution: %s\n", distributionInfo);
+        System.out.printf(" %s\n", distributionInfo);
     }
 
     /** Read out the result */

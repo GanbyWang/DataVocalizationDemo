@@ -2,6 +2,7 @@ package mainpakcage;
 
 import com.opencsv.CSVReader;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.File;
@@ -9,6 +10,22 @@ import java.io.FileReader;
 
 /** Used to store all the information about the CSV data*/
 public class DataAnalysis {
+
+    // The fraction of sampling
+    private double sampleFraction;
+    // Accessor to the database
+    private DbAccessor dbAccessor;
+    // The constraint of sampling
+    private String extraSQL;
+    // The target column
+    private int tarCol;
+    // General information of the sample
+    public double sampleMean;
+    public double sampleVar;
+    public double sampleMax;
+    public double sampleMin;
+    // Extracted list of the target column
+    public List<Double> singleColList;
 
     /** Used to store every tuple of the data */
     public class tuple {
@@ -71,6 +88,148 @@ public class DataAnalysis {
 
     /** Used to store the file */
     public List<tuple> originData = new ArrayList<tuple>();
+
+    /** The sample */
+    public List<List<Double>> sample = new ArrayList<List<Double>>();
+
+    /**
+     * Constructor function
+     * Accepts 3 arguments: sampling fraction, sampling constraint, target column
+     * */
+    public DataAnalysis(int sampleFraction, String extraSQL, int tarCol) {
+        this.sampleFraction = sampleFraction;
+        this.extraSQL = extraSQL;
+        this.tarCol = tarCol;
+
+        // Get the sample using SQL query
+        dbAccessor = new DbAccessor();
+        sample = dbAccessor.getSample(this.sampleFraction, this.extraSQL);
+        dbAccessor.disconnected();
+
+        // Calculate the general information of the sample
+        getBasicInfo();
+    }
+
+    /* Function to calculate all general information of the target column */
+    private void getBasicInfo() {
+        singleColList = new ArrayList<Double>();
+        singleColList.addAll(getSingleCol(sample, tarCol));
+
+        double mean = getMean(singleColList);
+        double var = getVariance(singleColList, mean);
+
+//        System.out.println(mean);
+//        System.out.println(var);
+
+        sampleMean = round(mean);
+        sampleVar = round(var);
+        sampleMax = getMax(singleColList);
+        sampleMin = getMin(singleColList);
+    }
+
+    /*
+     * Calculate the mean of the given array
+     * One parameter: the array
+     * */
+    private double getMean(List<Double> list) {
+        double sum = 0;
+        for(Double each : list) {
+            sum += each;
+        }
+        return sum / (double) list.size();
+    }
+
+    /*
+     * Calculate the variance of the given array
+     * Two parameter: the array and the mean of the array
+     * */
+    private double getVariance(List<Double> list, double mean) {
+        double sum = 0;
+        for(Double each : list) {
+            sum += Math.pow(each - mean, 2);
+        }
+        return sum / (double) list.size();
+    }
+
+    /*
+    * Helper function to round a double number
+    * The result only have 2 effective bits
+    * */
+    private double round(double num) {
+
+        double cp1 = num;
+        double cp2 = num;
+
+        int posPower = 0;
+        int negPower = 0;
+
+        if(num > 1) {
+            while (cp1 > 10) {
+                posPower++;
+                cp1 /= 10;
+            }
+
+            BigDecimal bd = new BigDecimal(cp1);
+            BigDecimal tmpBD = new BigDecimal(bd.setScale(2, BigDecimal.ROUND_HALF_EVEN).doubleValue()
+                                                * Math.pow(10, posPower));
+            return tmpBD.setScale(0, BigDecimal.ROUND_HALF_EVEN).doubleValue();
+        } else {
+            while(cp2 < 1) {
+                negPower++;
+                cp2 *= 10;
+            }
+
+            BigDecimal bd = new BigDecimal(cp2);
+            return bd.setScale(2, BigDecimal.ROUND_HALF_EVEN).doubleValue() / Math.pow(10, negPower);
+        }
+    }
+
+    /* Get the maximum of the given array */
+    private Double getMax(List<Double> list) {
+        double max = 0;
+        for(Double element : list) {
+            if(element > max) {
+                max = element;
+            }
+        }
+
+        return max;
+    }
+
+    /* Get the minimum of the given array */
+    private Double getMin(List<Double> list) {
+        double min = Double.MAX_VALUE;
+        for(Double element : list) {
+            if(element < min) {
+                min = element;
+            }
+        }
+
+        return min;
+    }
+
+    /* Extract every target column field from each tuple */
+    private List<Double> getSingleCol(List<List<Double>> lists, int colNum) {
+        List<Double> result = new ArrayList<Double>();
+
+        for(List<Double> singleTuple : lists) {
+            result.add(singleTuple.get(colNum));
+        }
+
+        return result;
+    }
+
+    /**
+     * Helper function to print all general information of the target column
+     * */
+    public String colInfo() {
+        String columnInfo = "";
+
+        columnInfo += "The average of column " + columnNames[tarCol] + " is " + sampleMean + ", ";
+        columnInfo += "the variance is " + sampleVar + ", ";
+
+        return columnInfo;
+    }
 
     /** This function reads in the CSV file and store all data into the array */
     public void readFile() throws Exception {
